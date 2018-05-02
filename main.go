@@ -38,6 +38,8 @@ Authorization Options:
         --pass <password>            Password required for connections
         --auth <token>               Authorization token required for connections
         --jwt_publickey <file>       File name or folder name to load public key(s) for JWT
+        --jwt_user_field <name>      Alternative JWT field for username
+        --jwt_nats_field <name>      Alternative JWT field for NATS permissions
 TLS Options:
         --tls                        Enable TLS, do not verify clients (default: false)
         --tlscert <file>             Server certificate file
@@ -68,6 +70,12 @@ func main() {
 
 	var pkName string
 	fs.StringVar(&pkName, "jwt_publickey", "", "File name or folder name to load public key(s) for JWT.")
+
+	var userField string
+	fs.StringVar(&userField, "jwt_user_field", "", "Alternative JWT field which contains the username")
+
+	var natsField string
+	fs.StringVar(&natsField, "jwt_nats_field", "", "Alternative JWT field which contains the NATS permissions")
 
 	// Configure the options from the flags/config file
 	opts, err := server.ConfigureOptions(fs, os.Args[1:],
@@ -105,6 +113,8 @@ func main() {
 		}
 		jwtAuther = &jwtauth.JWTAuth{
 			PublicKeys: pkeys,
+			UserField:  userField,
+			NatsField:  natsField,
 		}
 		opts.CustomClientAuthentication = jwtAuther
 	}
