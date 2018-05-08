@@ -8,6 +8,12 @@
   version = "v3.1.0"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/mitchellh/mapstructure"
+  packages = ["."]
+  revision = "00c29f56e2386353d58c599509e8dc3801b0d716"
+
+[[projects]]
   name = "github.com/nats-io/gnatsd"
   packages = [
     "conf",
@@ -52,6 +58,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "392766971742e5332533f40ea64dd9e182f258a7c582c07ae3910ca787d34fea"
+  inputs-digest = "b9c30c71e1543f2b4ccc088e866e2cd79bc299413767b16050d0abb25b25479f"
   solver-name = "gps-cdcl"
   solver-version = 1

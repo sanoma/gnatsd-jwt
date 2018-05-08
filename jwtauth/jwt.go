@@ -8,12 +8,15 @@ import (
 	"strings"
 
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/mitchellh/mapstructure"
 	"github.com/nats-io/gnatsd/server"
 )
 
 // JWTAuth implements server.Authentication interface
 type JWTAuth struct {
 	PublicKeys []KeyProvider
+	UserField  string
+	NatsField  string
 	logger     Logger
 }
 
@@ -22,11 +25,11 @@ var _ server.Authentication = (*JWTAuth)(nil)
 
 // Token is accept model token should match
 type Token struct {
-	Subject     string              `json:"sub"`
-	ExpiresAt   *int64              `json:"exp,omitempty"`
-	User        string              `json:"user,omitempty"`
-	Name        string              `json:"name,omitempty"`
-	Permissions *server.Permissions `json:"permissions,omitempty"`
+	Subject     string              `mapstructure:"sub"`
+	ExpiresAt   *int64              `mapstructure:"exp"`
+	User        string              `mapstructure:"user"`
+	Name        string              `mapstructure:"name"`
+	Permissions *server.Permissions `mapstructure:"permissions"`
 }
 
 // Check returns true if connection is valid
@@ -40,16 +43,13 @@ func (auth *JWTAuth) Check(c server.ClientAuthentication) (verified bool) {
 	if opts == nil {
 		return
 	}
-	token, err := auth.Verify(opts.Authorization, &Token{})
+	token, err := auth.Verify(opts.Authorization, &jwt.MapClaims{})
 	if err != nil {
 		auth.Errorf("failed to auth token, %v", err)
 		return
 	}
-	claims, ok := token.Claims.(*Token)
-	if !ok {
-		return
-	}
-	user := auth.GetUser(claims)
+
+	user := auth.GetUser(token.Claims)
 	if user == nil {
 		return
 	}
@@ -58,19 +58,37 @@ func (auth *JWTAuth) Check(c server.ClientAuthentication) (verified bool) {
 	return true
 }
 
-// GetUser extract user from given token
-func (auth *JWTAuth) GetUser(token *Token) *server.User {
+// GetUser extract user from given claims
+func (auth *JWTAuth) GetUser(claims jwt.Claims) *server.User {
 	var user server.User
+	var token *Token
+	mapstructure.Decode(claims.(*jwt.MapClaims), &token)
+
 	if token.Subject != "" {
 		user.Username = token.Subject
 	} else if token.User != "" {
 		user.Username = token.User
 	} else if token.Name != "" {
 		user.Username = token.Name
+	} else if auth.UserField != "" {
+		customClaims := claims.(*jwt.MapClaims)
+		if username, ok := (*customClaims)[auth.UserField].(string); ok {
+			user.Username = username
+		}
 	}
 	if user.Username == "" {
 		auth.Errorf("User name is required")
 		return nil
+	}
+
+	if auth.NatsField != "" {
+		customClaims := claims.(*jwt.MapClaims)
+		if nats, ok := (*customClaims)[auth.NatsField].(map[string]interface{}); ok {
+			mapstructure.Decode(nats["permissions"], &token.Permissions)
+		} else {
+			auth.Errorf("Unable to parse JWT field %v", auth.NatsField)
+			return nil
+		}
 	}
 	if token.Permissions != nil {
 		// check permissions
